@@ -7,6 +7,7 @@ import android.graphics.Matrix;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.util.Log;
+import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
 import android.view.WindowManager;
@@ -51,6 +52,8 @@ public class PrivateTextureViewActivity extends BaseActivity implements AGEventH
     private SeekBar mRotationSeekBar;
     private SeekBar mZoomSeekBar;
 
+    private SurfaceView mSurfaceView;
+
     private boolean mLocalSourceFlag = true;
 
     @Override
@@ -69,6 +72,7 @@ public class PrivateTextureViewActivity extends BaseActivity implements AGEventH
         mRotationSeekBar.setOnSeekBarChangeListener(seekBarCallBack);
         mZoomSeekBar = (SeekBar) findViewById(R.id.seekBar3);
         mZoomSeekBar.setOnSeekBarChangeListener(seekBarCallBack);
+        mSurfaceView = (SurfaceView) findViewById(R.id.surface);
     }
 
     @Override
@@ -213,8 +217,9 @@ public class PrivateTextureViewActivity extends BaseActivity implements AGEventH
         EglBase.Context sharedContext;
         if (mLocalSourceFlag) {
             Log.i(TAG, "switch to camera source");
-            mVideoSource = new AgoraTextureCamera(this, 640, 480);
-            sharedContext = ((AgoraTextureCamera) mVideoSource).getEglContext();
+            mVideoSource = new MyAgoraTextureCamera(this, 640, 480);
+            ((MyAgoraTextureCamera) mVideoSource).setSurfaceView(mSurfaceView);
+            sharedContext = ((MyAgoraTextureCamera) mVideoSource).getEglContext();
             container.getLayoutParams().width = wm.getDefaultDisplay().getWidth() * 2 / 5;
         } else {
             Log.i(TAG, "switch to local video source");

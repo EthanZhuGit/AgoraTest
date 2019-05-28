@@ -86,7 +86,7 @@ public class RecordActivity extends AppCompatActivity implements View.OnClickLis
         CameraWrapper.getInstance()
                 .setCameraId(Camera.CameraInfo.CAMERA_FACING_BACK)
                 .doOpenCamera(surfaceView);
-        CameraWrapper.getInstance().pausePreview();
+//        CameraWrapper.getInstance().pausePreview();
         CameraWrapper.getInstance().startPreview();
     }
 

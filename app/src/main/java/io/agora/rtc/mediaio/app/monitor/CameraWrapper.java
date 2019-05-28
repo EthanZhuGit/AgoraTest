@@ -248,8 +248,8 @@ public class CameraWrapper {
 
         @Override
         public void onPreviewFrame(byte[] data, Camera camera) {
-//            if (DEBUG)
-//                Logger1.i(TAG, "onPreviewFrame: %s t=%s", data.length, Thread.currentThread());
+            if (DEBUG)
+                Logger1.i(TAG, "onPreviewFrame: %s t=%s", data.length, Thread.currentThread());
             //当启动录制的视频把视频源数据加入编码中
             MuxerManager.getInstance().addVideoFrameData(data);
             camera.addCallbackBuffer(data);

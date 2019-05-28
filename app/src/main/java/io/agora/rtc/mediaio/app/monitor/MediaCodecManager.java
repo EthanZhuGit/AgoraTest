@@ -7,12 +7,16 @@ import android.media.MediaFormat;
 import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.support.v4.util.Pools;
+import android.util.Log;
+import android.view.Surface;
 
 
 import com.wzh.yuvwater.jni.YuvOsdUtils;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -22,7 +26,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import io.agora.rtc.mediaio.app.utils.Logger1;
 
 @TargetApi(Build.VERSION_CODES.M)
-class MediaCodecManager {
+public class MediaCodecManager {
     public static boolean DEBUG = false;
 
     private static final String TAG = "MediaCodecManager";
@@ -57,6 +61,8 @@ class MediaCodecManager {
     private int rotation;
     private Pools.SimplePool<MuxerData> mPools;
 
+    private Surface mSurface;
+
     private MediaCodecManager() {
         mHandlerThread = new HandlerThread("codecThread");
         mHandlerThread.start();
@@ -71,6 +77,10 @@ class MediaCodecManager {
             }
         }
         return sInstance;
+    }
+
+    public void setSurface(Surface surface) {
+        mSurface = surface;
     }
 
     /**
@@ -156,9 +166,10 @@ class MediaCodecManager {
     }
 
     public void addFrameData(byte[] data) {
+        Logger1.i(TAG, "addFrameData: " + isStart + " " + isPause);
         if (isStart && !isPause) {
             boolean isOffer = frameBytes.offer(data);
-//            Logger1.i(TAG, "addFrameData: isOffer=%s", isOffer);
+            Logger1.i(TAG, "addFrameData: isOffer=%s", isOffer);
             if (!isOffer) {
                 frameBytes.poll();
                 frameBytes.offer(data);
@@ -212,7 +223,6 @@ class MediaCodecManager {
             mMediaCodec.setCallback(new MediaCodec.Callback() {
                 @Override
                 public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
-
                     byte[] data = null;
                     try {
                         data = frameBytes.take();
@@ -224,20 +234,21 @@ class MediaCodecManager {
                         return;
                     }
 
-//                    Logger1.i(TAG, "onInputBufferAvailable: %s index=%d frameLen=%s", Thread.currentThread(), index, data == null ? "null" : "" + data.length);
+                    Logger1.i(TAG, "onInputBufferAvailable: %s index=%d frameLen=%s", Thread.currentThread(), index, data == null ? "null" : "" + data.length);
 
                     ByteBuffer inputBuffer = codec.getInputBuffer(index);
                     if (inputBuffer == null)
                         return;
                     if (isAddOSD) {
-//                        long start= SystemClock.uptimeMillis();
+                        long start= SystemClock.uptimeMillis();
                         String date = mFormat.format(new Date());
                         YuvOsdUtils.addOsd(data, outData, date);
-//                        long time=SystemClock.uptimeMillis()-start;
-//                        Logger1.d(TAG,"time="+time+" ms");
+                        long time=SystemClock.uptimeMillis()-start;
+                        Logger1.d(TAG,"time="+time+" ms");
                     } else {
                         YuvOsdUtils.NV21ToNV12(data, dstWidth, dstHeight);
                     }
+
 
                     inputBuffer.clear();
                     inputBuffer.put(outData);
@@ -245,7 +256,7 @@ class MediaCodecManager {
                     long currentTimeUs = (System.nanoTime()-mTime) / 1000;//通过控制时间轴，达到暂停录制，继续录制的效果
 
                     codec.queueInputBuffer(index, 0, outData.length, currentTimeUs, 0);
-//                    Logger1.i(TAG, "onInputBufferAvailable: currentTimeUs=%s ", currentTimeUs);
+                    Logger1.i(TAG, "onInputBufferAvailable: currentTimeUs=%s ", currentTimeUs);
 
                 }
 
@@ -253,7 +264,7 @@ class MediaCodecManager {
                 public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
 
                     ByteBuffer outputBuffer = codec.getOutputBuffer(index);
-//                    Logger1.i(TAG, "onOutputBufferAvailable: %s flag=%s timeus=%s", outputBuffer, info.flags, info.presentationTimeUs);
+                    Logger1.i(TAG, "onOutputBufferAvailable: %s flag=%s timeus=%s", outputBuffer, info.flags, info.presentationTimeUs);
 
                     if (!isHasKeyFrame && info.flags == MediaCodec.BUFFER_FLAG_KEY_FRAME) {
                         isHasKeyFrame = true;
@@ -281,6 +292,7 @@ class MediaCodecManager {
                     }
 
                     codec.releaseOutputBuffer(index, false);
+
                 }
 
                 @Override
@@ -291,15 +303,16 @@ class MediaCodecManager {
                 @Override
                 public void onOutputFormatChanged(@NonNull MediaCodec codec, @NonNull MediaFormat format) {
                     MediaFormat newFormat = mMediaCodec.getOutputFormat();
-//                    Logger1.i(TAG, "添加视轨  " + newFormat.toString());
+                    Logger1.i(TAG, "onOutputFormatChanged 添加视轨  " + newFormat.toString());
                     mMuxerManager.sendAddTrack(MuxerManager.TRACK_VIDEO, newFormat);
                 }
             }, mHandler);
             mMediaCodec.start();
-        } catch (Exception e) {
+        } catch (IOException e) {
             return;
         }
         isStart = true;
+        Logger1.i(TAG, "start " + isStart);
     }
 
     /**
